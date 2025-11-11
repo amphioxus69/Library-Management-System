@@ -10,19 +10,6 @@ mycon = mysql.connector.connect(
 )
 cursor = mycon.cursor()
 
-# ----------[ADMIN LOGIN]----------
-def admin_login():
-    usn = input("Enter username: ").strip()
-    pswd = input("Enter password: ").strip()
-
-    query = "select * from admins where username = %s and password = %s"
-    cursor.execute(query,(usn,pswd))
-    row = cursor.fetchone()
-     
-    if row:
-        return True
-    else: 
-        return False   
 
 # ----------[TABLE HEADERS]----------
 table_headers = {
@@ -152,11 +139,14 @@ def update(table,key_field,key_value,field,current,cast=str):
 
 # ----------UNIVERSAL DELETE----------
 def delete(table,key_field,key_value):
-    query = f"delete from {table} where {key_field} = %s"
-    cursor.execute(query,(key_value,))
-    mycon.commit()
+    if get_choice("\n===[CONFIRM DELETION]===\n   (y/n): "):
+        query = f"delete from {table} where {key_field} = %s"
+        cursor.execute(query,(key_value,))
+        mycon.commit()
 
-    print("\n\n===[Record Deleted Successfully]===\n")
+        print("\n\n===[Record Deleted Successfully]===\n")
+    else:
+        return
 
 # ----------UNIVERSAL VIEW----------
 def view(table,field,value):
@@ -190,6 +180,105 @@ def get_record(table,field,cast=str):
                 continue
             else:
                 return None
+    
+
+# ----------[AUTHENTICATION]----------
+def admin_auth():
+    for i in range(3):
+        print("\n Admin Login")
+        print("=============")
+        usn = input("Enter username: ").strip()
+        pswd = input("Enter password: ").strip()
+
+        query = "select * from admins where username = %s and password = %s"
+        cursor.execute(query,(usn,pswd))
+        row = cursor.fetchone()
+     
+        if row:
+            print("\n---[Login Successful]---")
+            return True
+        else: 
+            print(f"\n---[Invalid Credentials: Attempt {i+1}/3]---\n")
+    print("~LOGIN FAILED~\n")
+    return False   
+def user_auth():
+    def user_sign_in():
+        for i in range(3):
+            print("\n User Sign-In")
+            print("============")
+            email = input("Enter email: ").strip()
+            pswd = input("Enter password: ").strip()
+
+            query = "select * from users where email = %s and password = %s"
+            cursor.execute(query,(email,pswd))
+            row = cursor.fetchone()
+        
+            if row:
+                print("\n---[Login Successful]---")
+                return True
+            else: 
+                print(f"\n---[Invalid Credentials: Attempt {i+1}/3]---\n")
+        print("~LOGIN FAILED~\n")
+    def user_sign_up():
+        while True:
+            print("\n User Sign-Up")
+            print("==============")
+
+            email = input("Enter email: ").strip()
+            if get_record("users",email):
+                print("\n---[User ID Already Exists]---\n")
+                if get_choice(f"Sign in to {email}? (y/n): "):
+                    if user_sign_in():
+                        return True
+                    else:
+                        return False
+                else:
+                    continue
+
+            name = input("Enter Full Name: ").strip()
+            password = input("Create Password: ").strip()
+            contact = input("Enter Contact Number: ").strip()
+            date_joined = datetime.today().date()
+
+            row = [(name,password,contact,date_joined)]
+            table_generator(row,table_headers[1:])
+
+            if get_choice("Confirm Signup? (y/n): "):
+                add(
+                    "users",
+                    name=name,
+                    password=password,
+                    contact = contact,
+                    date_joined=date_joined
+                )
+                print("\n---[Account Created Successfully]---\n")
+                return
+            else:
+                if get_retry_choice():
+                    continue
+                else:
+                    return False
+
+    while True:
+        print("1. Sign in")
+        print("2. Sign up")
+        try:
+            choice = int(input("\nEnter choice: "))
+        except ValueError:
+            print("\n---[Invalid Input]---\n")
+            continue
+        match choice:
+            case 1:
+                if user_sign_in():
+                    return True
+                else:
+                    return False
+            case 2:
+                if user_sign_up():
+                    return True
+                else: 
+                    return False
+                    
 
 # ----------[MANAGE BOOKS]----------
 def manage_books():
@@ -398,7 +487,7 @@ def manage_users():
                     return
     def update_user():
         while True: 
-            print("\n Update Book")
+            print("\n Update User")
             print("=============")
             rows = get_record("users","user_id",cast=int)
             if rows is None:
@@ -418,10 +507,9 @@ def manage_users():
             print("\n---Choose field to update---\n")
             print("1. Name")
             print("2. Email")
-            print("3. Password")
-            print("4. Contact")
-            print("5. Date joined")
-            print("6. Back")
+            print("3. Contact")
+            print("4. Date joined")
+            print("5. Back")
 
             try:
                 choice = int(input("\nEnter choice: "))
@@ -432,10 +520,9 @@ def manage_users():
             match choice:
                 case 1:update("users","user_id",row[0],"name",row[1])
                 case 2:update("users","user_id",row[0],"email",row[2])
-                case 3:update("users","user_id",row[0],"password",row[3])
-                case 4:update("users","user_id",row[0],"contact",row[4])
-                case 5:update("users","user_id",row[0],"date_joined",row[5])
-                case 6:return
+                case 3:update("users","user_id",row[0],"contact",row[4])
+                case 4:update("users","user_id",row[0],"date_joined",row[5])
+                case 5:return
                 case _:print("\n---[Invalid Choice]---")
     def view_user():
         while True:
@@ -444,11 +531,10 @@ def manage_users():
             print("1. By User ID")
             print("2. By Name")
             print("3. By Email")
-            print("4. By Password")
-            print("5. By Contact") 
-            print("6. By Date Joined")
-            print("7. All Records")
-            print("8. Back")
+            print("4. By Contact") 
+            print("5. By Date Joined")
+            print("6. All Records")
+            print("7. Back")
 
             try:
                 choice = int(input("\nEnter choice: "))
@@ -467,17 +553,14 @@ def manage_users():
                     print("\n---By Email---")
                     rows = get_record("users", "email")
                 case 4:
-                    print("\n---By Password---")
-                    rows = get_record("users", "password")
-                case 5:
                     print("\n---By Contact---")
                     rows = get_record("users", "contact")
-                case 6:
+                case 5:
                     print("\n---By Date Joined---")
                     rows = get_record("users", "date_joined")
-                case 7:
+                case 6:
                     rows = search("users")
-                case 8:
+                case 7:
                     return
                 case _:
                     print("\n---[Invalid Choice]---")
@@ -532,15 +615,15 @@ def manage_users():
 # ----------[MANAGE EMPLOYEES]----------
 def manage_employees():
 
-    def add_employee():
+    def add_emp():
         while True:
-            print("\n Add employee")
-            print("==========")
+            print("\n Add Employee")
+            print("==============")
             name = input("Enter Name: ").strip()
             email = input("Enter Email: ").strip()
             contact = input("Enter Contact: ").strip()
             desig = input("Enter Designation: ").strip()
-            salary = input("Enter Salary: ").strip()
+            salary = float(input("Enter Salary: "))
             date_str = input("Enter Date Joined (YYYY-MM-DD): ").strip()
             try:
                 date = datetime.strptime(date_str, "%Y-%m-%d").date()
@@ -554,7 +637,7 @@ def manage_employees():
             
             if get_choice("Commit this entry? (y/n): "):
                 add(
-                    "users",
+                    "employees",
                     name=name,
                     email=email,
                     contact=contact,
@@ -568,10 +651,10 @@ def manage_employees():
                     continue
                 else:
                     return
-    def update_employee():
+    def update_emp():
         while True: 
-            print("\n Update employee")
-            print("=============")
+            print("\n Update Employee")
+            print("=================")
             rows = get_record("employees","emp_id",cast=int)
             if rows is None:
                 return
@@ -607,21 +690,22 @@ def manage_employees():
                 case 2:update("employees","emp_id",row[0],"email",row[2])
                 case 3:update("employees","emp_id",row[0],"contact",row[3])
                 case 4:update("employees","emp_id",row[0],"designation",row[4])
-                case 5:update("employees","emp_id",row[0],"salary",row[5],int)
-                case 6:return
+                case 5:update("employees","emp_id",row[0],"salary",row[5],float)
+                case 6:update("employees","emp_id",row[0],"date_joined",row[6])
                 case _:print("\n---[Invalid Choice]---")
-    def view_user():
+    def view_emp():
         while True:
-            print("\n View User")
-            print("===========")
-            print("1. By User ID")
+            print("\n View Employee")
+            print("===============")
+            print("1. By Employee ID")
             print("2. By Name")
             print("3. By Email")
-            print("4. By Password")
-            print("5. By Contact") 
-            print("6. By Date Joined")
-            print("7. All Records")
-            print("8. Back")
+            print("4. By Contact")
+            print("5. By Designation") 
+            print("6. By Salary")
+            print("7. By Date Joined")
+            print("8. All Records")
+            print("9. Back")
 
             try:
                 choice = int(input("\nEnter choice: "))
@@ -631,26 +715,29 @@ def manage_employees():
 
             match choice:
                 case 1:
-                    print("\n---By User ID---")
-                    rows = get_record("users", "user_id", int)
+                    print("\n---By Employee ID---")
+                    rows = get_record("employees", "emp_id", int)
                 case 2:
                     print("\n---By Name---")
-                    rows = get_record("users", "name")
+                    rows = get_record("employees", "name")
                 case 3:
                     print("\n---By Email---")
-                    rows = get_record("users", "email")
+                    rows = get_record("employees", "email")
                 case 4:
-                    print("\n---By Password---")
-                    rows = get_record("users", "password")
-                case 5:
                     print("\n---By Contact---")
-                    rows = get_record("users", "contact")
+                    rows = get_record("employees", "contact")
+                case 5:
+                    print("\n---By Designation---")
+                    rows = get_record("employees", "designation")
                 case 6:
-                    print("\n---By Date Joined---")
-                    rows = get_record("users", "date_joined")
+                    print("\n---By Salary---")
+                    rows = get_record("employees", "salary",float)
                 case 7:
-                    rows = search("users")
+                    print("\n---By Date Joined---")
+                    rows = get_record("employees", "date_joined")
                 case 8:
+                    rows = search("employees")
+                case 9:
                     return
                 case _:
                     print("\n---[Invalid Choice]---")
@@ -658,20 +745,20 @@ def manage_employees():
 
             if rows:
                 print()
-                table_generator(rows, table_headers["users"])
+                table_generator(rows, table_headers["employees"])
                 print()
-    def del_user():
+    def del_emp():
         while True: 
-            print("\n Delete User")
-            print("=============")
-            rows = get_record("users","user_id",cast=int)
+            print("\n Delete Employee")
+            print("=================")
+            rows = get_record("employees","emp_id",cast=int)
             if rows is None:
                 return
             print()
-            table_generator(rows,table_headers["users"])
+            table_generator(rows,table_headers["employees"])
 
-            if get_choice("\nSelect this user for deletion? (y/n): "):
-                delete("users","user_id",rows[0][0])
+            if get_choice("\nSelect this employee for deletion? (y/n): "):
+                delete("employees","emp_id",rows[0][0])
                 break
             else:
                 if get_retry_choice():
@@ -681,12 +768,12 @@ def manage_employees():
 
 
     while True:
-        print("\n Manage Users")
-        print("==============")
-        print("1. Add User")
-        print("2. Update User")
-        print("3. View User")
-        print("4. Delete User")
+        print("\n Manage Employees")
+        print("==================")
+        print("1. Add Employee")
+        print("2. Update Employee")
+        print("3. View Employee")
+        print("4. Delete Employee")
         print("5. Back")
         try:
             choice = int(input("\nEnter choice: "))
@@ -695,27 +782,149 @@ def manage_employees():
             continue
 
         match choice:
-            case 1:add_user()
-            case 2:update_user()
-            case 3:view_user()
-            case 4:del_user()
+            case 1:add_emp()
+            case 2:update_emp()
+            case 3:view_emp()
+            case 4:del_emp()
             case 5:break
             case _: print("\n---[Invalid Choice]---")
 
+# ----------[MANAGE RENTALS]----------
+def manage_rentals():
+    
+    def issue_book():
+        while True:
+            print("\n Issue Book")
+            print("============")
+            u_id = input("Enter User ID: ").strip()
+            b_id = input("Enter Book Id: ").strip()
+            issue_str = input("Enter Issue-Date (YYYY-MM-DD): ").strip()
+            try:
+                issue_date = datetime.strptime(issue_str, "%Y-%m-%d").date()
+            except ValueError:
+                print("\n---[Invalid Input]---")
+                continue
+            due_str = input("Enter Due-Date (YYYY-MM-DD): ").strip()
+            try:
+                due_date = datetime.strptime(due_str, "%Y-%m-%d").date()
+            except ValueError:
+                print("\n---[Invalid Input]---")
+                continue
+
+            row = [(u_id,b_id,issue_date,due_date)]
+            col = [("USER ID","BOOK ID","ISSUE DATE","DUE DATE")]
+            table_generator(row,col)
+            
+            if get_choice("Commit this entry? (y/n): "):
+                add(
+                    "rentals",
+                    user_id=u_id,
+                    book_id=b_id,
+                    issue_date=issue_date,
+                    due_date=due_date
+                )
+                query = "update books set available_copies = available_copies - 1 where book_id = %s"
+                cursor.execute(query,(b_id,))
+                mycon.commit()
+                return
+            else:
+                if get_retry_choice():
+                    continue
+                else:
+                    return
+    def return_book():
+        while True:
+            while True:
+                print("\n Return Book")
+                print("=============")
+
+                rental_id = input("Enter Rental ID: ").strip()
+
+                rows = search("rentals", rental_id=rental_id)
+                if not rows:
+                    print("\n---[Rental Not Found]---")
+                    if get_retry_choice():
+                        continue
+                    return
+                
+                row = rows[0]
+                if row[5] is not None:
+                    print("\n---[This Book is Already Returned]---")
+                    return
+                
+                print()
+                table_generator(rows,table_headers["rentals"])
+
+                if get_choice("\nSelect this for return? (y/n): "):
+                    break
+                else:
+                    if get_retry_choice():
+                        continue
+                    else:
+                        return
+                
+            return_str = input("Enter Return-Date (YYYY-MM-DD): ").strip()
+            try:
+                return_date = datetime.strptime(return_str, "%Y-%m-%d").date()
+            except ValueError:
+                print("\n---[Invalid Input]---")
+                continue
+
+            b_id = row[2]
+            val = [(rental_id, b_id, return_date)]
+            table_generator(val, ["RENTAL ID","BOOK ID","RETURN DATE"])
+
+            if get_choice("Confirm Return? (y/n): "):
+                
+                query1 = "update rentals set return_date = %s where rental_id = %s"
+                cursor.execute(query1,(return_date,rental_id))
+                mycon.commit()
+
+                query2 = "update books set available_copies = available_copies + 1 where book_id = %s"
+                cursor.execute(query2,(b_id,))
+                mycon.commit()
+                
+                return
+            else:
+                if get_retry_choice():
+                    continue
+                return
+    # def extend_due_date():
+
+    # def view_rentals():
 
 
+    while True:
+        print("\n Manage Rentals")
+        print("================")
+        print("1. Issue Book")
+        print("2. Return Book")
+        print("3. Extend Due Date")
+        print("4. View Rentals")
+        print("5. Back")
+        try:
+            choice = int(input("\nEnter choice: "))
+        except ValueError:
+            print("\n---[Invalid Input]---\n")
+            continue
 
-#__main__
-print("\n LIBRARY MANAGEMENT SYSTEM")
-print("===========================\n")
+        match choice:
+            case 1:issue_book()
+            case 2:return_book()
+            case 3:extend_due_date()
+            case 4:view_rentals()
+            case 5:break
+            case _: print("\n---[Invalid Choice]---")
 
 # ==========[MAIN MENU]==========
 def main():
+    print("\n LIBRARY MANAGEMENT SYSTEM")
+    print("===========================\n")
     while True:
         print(" Main Menu")
         print("===========")
-        print("1. Admin Login")
-        print("2. User Login")
+        print("1. Admin")
+        print("2. User")
         print("3. EXIT")
         try:
             choice = int(input("\nEnter choice: "))
@@ -725,18 +934,9 @@ def main():
 
         match choice:
             case 1:
-                # ADMIN LOGIN
-                # print("\n Admin Login")
-                # print("=============")
-                # for i in range(3):
-                #     if admin_login():
-                #         print("\n---[Login Successful]---")
-                #         break
-                #     else:
-                #         print(f"\n---[Invalid Credentials: Attempt {i+1}/3]---\n")
-                # else:
-                #     print("~LOGIN FAILED~\n")
-                #     continue
+
+                if not admin_auth():
+                    continue
 
                 #ADMIN MENU   
                 while True:
@@ -745,9 +945,8 @@ def main():
                     print("1. Manage Books")
                     print("2. Manage Users")
                     print("3. Manage Employees")
-                    print("4. View Rentals")
-                    print("5. Calculate Fine")
-                    print("6. Back")
+                    print("4. Manage Rentals")
+                    print("5. Back")
                     try:
                         choice = int(input("\nEnter choice: "))
                     except ValueError:
@@ -757,8 +956,41 @@ def main():
                     match choice:
                         case 1: manage_books()
                         case 2: manage_users()
+                        case 3: manage_employees()
+                        case 4: manage_rentals()
+                        case 5: continue
+                        case _: print("\n---[Invalid Choice]---")
+
             case 2:
-                break
+                # USER LOGIN
+                if not user_auth():
+                    continue
+
+                    # match choice:
+                    #     case 1:
+                    #         if not user_sign_in():
+                    #             continue
+                    #     case 2:
+
+
+
+                # while True:
+                #     print("\n User Menu")
+                #     print("===========")
+                #     print("1. Profile")
+                #     print("2. View Books")
+                #     print("3. Search Books")
+                #     print("4. Rent Books")
+                #     print("5. Return Books")
+                #     print("6. Back")
+                #     try:
+                #         choice = int(input("\nEnter choice: "))
+                #     except ValueError:
+                #         print("\n---[Invalid Input]---\n")
+                #         continue
+
+
+
             case 3:
                 if get_choice("\nAre you sure you want to EXIT? (y/n): "):
                     print("\n~{Thank You}~\n")
